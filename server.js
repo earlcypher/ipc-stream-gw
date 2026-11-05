@@ -127,16 +127,10 @@ server.on("upgrade", (req, socket, head) => {
         try { tcpSock.destroy(); } catch (_) {}
         try { ws.close(); } catch (_) {}
       };
-      // Clean WebSocket close: send a graceful FIN so the origin never sees
-      // an abrupt RST. Hard destroy is kept for errors only.
-      const gracefulEnd = () => {
-        try { tcpSock.end(); } catch (_) {}
-        try { ws.close(); } catch (_) {}
-      };
       tcpSock.on("error", cleanup);
       tcpSock.on("close", cleanup);
       ws.on("error", cleanup);
-      ws.on("close", gracefulEnd);
+      ws.on("close", cleanup);
       tcpSock.resume();
     });
     return;
@@ -216,17 +210,17 @@ async function startConnector() {
     `credentials-file: ${credPath}`,
     "protocol: http2",
     "no-autoupdate: true",
-    // Disable idle keep-alive pooling to the local relay. Origins that close
-    // sockets abruptly would otherwise leave dead sockets in the pool (502s).
+    // Drop idle origin keep-alive sockets almost immediately. The local relay
+    // can hand back a socket the origin already closed (-> 502) if reused.
     "originRequest:",
-    "  keepAliveConnections: 0",
+    "  keepAliveTimeout: 1ms",
     "ingress:",
   ];
   for (const r of ROUTE_RULES) {
     lines.push(`  - hostname: ${r.hostname}`);
     lines.push(`    service: http://127.0.0.1:${r.listenPort}`);
     lines.push("    originRequest:");
-    lines.push("      keepAliveConnections: 0");
+    lines.push("      keepAliveTimeout: 1ms");
   }
   lines.push("  - service: http_status:404");
   fs.writeFileSync(cfgPath, lines.join("\n") + "\n", { mode: 0o600 });
