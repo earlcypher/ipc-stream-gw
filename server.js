@@ -35,16 +35,9 @@ const pending = new Map(); // id -> { sock, timer }
 
 const server = http.createServer((req, res) => {
   if (req.url === "/healthz") {
+    // Public liveness only. Internal agent details are not exposed.
     res.writeHead(200, { "Content-Type": "application/json" });
-    return res.end(
-      JSON.stringify({
-        ok: true,
-        agentConnected: Boolean(activeAgent && activeAgent.readyState === activeAgent.OPEN),
-        agentHost: activeHost,
-        agentBootTs: activeBootTs,
-        connectorReady,
-      }) + "\n"
-    );
+    return res.end(JSON.stringify({ ok: true }) + "\n");
   }
   res.writeHead(404);
   res.end();
